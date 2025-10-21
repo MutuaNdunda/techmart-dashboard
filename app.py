@@ -6,7 +6,17 @@ import plotly.express as px
 from datetime import datetime
 
 # --- CONFIG ---
-DB_URL = "postgresql://postgres:%23Kenya%402025@db.jojtpfepksshdzpxjlvf.supabase.co:5432/postgres?sslmode=require"
+#DB_URL = "postgresql://postgres:%23Kenya%402025@db.jojtpfepksshdzpxjlvf.supabase.co:5432/postgres?sslmode=require"
+
+# --- Load DB URL from Streamlit secrets ---
+DB_URL = st.secrets["database"]["DB_URL"]
+
+# --- Create SQLAlchemy engine with SSL enforcement ---
+try:
+    engine = create_engine(DB_URL, connect_args={"sslmode": "require"})
+except OperationalError as e:
+    st.error(f"Database connection failed: {e}")
+    st.stop()
 
 st.set_page_config(
     page_title="TechMart Analytics Dashboard",
