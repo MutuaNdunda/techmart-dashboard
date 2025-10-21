@@ -1,4 +1,5 @@
 # dashboard_app.py
+
 import streamlit as st
 import pandas as pd
 from sqlalchemy import create_engine
@@ -6,17 +7,7 @@ import plotly.express as px
 from datetime import datetime
 
 # --- CONFIG ---
-#DB_URL = "postgresql://postgres:%23Kenya%402025@db.jojtpfepksshdzpxjlvf.supabase.co:5432/postgres?sslmode=require"
-
-# --- Load DB URL from Streamlit secrets ---
-DB_URL = st.secrets["database"]["DB_URL"]
-
-# --- Create SQLAlchemy engine with SSL enforcement ---
-try:
-    engine = create_engine(DB_URL, connect_args={"sslmode": "require"})
-except OperationalError as e:
-    st.error(f"Database connection failed: {e}")
-    st.stop()
+DB_URL = "postgresql://postgres:%23Kenya%402025@db.jojtpfepksshdzpxjlvf.supabase.co:5432/postgres?sslmode=require"
 
 st.set_page_config(
     page_title="TechMart Analytics Dashboard",
@@ -31,6 +22,8 @@ def load_data():
     engine = create_engine(DB_URL)
     query = "SELECT * FROM transactions;"
     df = pd.read_sql(query, engine)
+
+    # Convert timestamp columns
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df['month'] = df['timestamp'].dt.to_period('M').astype(str)
     df['day'] = df['timestamp'].dt.date
@@ -68,7 +61,7 @@ with st.spinner("Loading transaction data..."):
 
 if refresh:
     st.cache_data.clear()
-    st.rerun()
+    st.experimental_rerun()
 
 # --- SIDEBAR FILTERS ---
 # County filter
@@ -94,6 +87,7 @@ selected_payment = st.sidebar.multiselect("💳 Payment Method", payments)
 selected_gender = st.sidebar.multiselect("🚻 Gender", genders)
 selected_age_group = st.sidebar.multiselect("👶🧑‍💼👨‍🦳 Age Group", ["Minor", "Youth", "Adult"])
 
+# Drill-down and roll-up options
 view_option = st.sidebar.radio("📅 Drill-Down Level", ["Monthly", "Daily", "Hourly"])
 roll_option = st.sidebar.radio("📊 Roll-Up Period", ["Monthly", "Quarterly"])
 
@@ -102,6 +96,7 @@ st.sidebar.caption("💡 Data auto-refreshes every 10 minutes or manually via th
 
 # --- APPLY FILTERS ---
 filtered_df = df.copy()
+
 if selected_county:
     filtered_df = filtered_df[filtered_df['county'].isin(selected_county)]
 if selected_store:
@@ -146,14 +141,19 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # --- TAB 1: Location Comparison ---
 with tab1:
     st.subheader("Sales by Category — Location vs Overall")
-
     if 'county' in filtered_df.columns:
         county_sales = (
-            filtered_df.groupby('county')['revenue'].sum().reset_index().sort_values('revenue', ascending=False)
+            filtered_df.groupby('county')['revenue']
+            .sum()
+            .reset_index()
+            .sort_values('revenue', ascending=False)
         )
         fig_county = px.bar(
-            county_sales, x='county', y='revenue',
-            title="Revenue by County", labels={"revenue": "Revenue (KES)"}
+            county_sales,
+            x='county',
+            y='revenue',
+            title="Revenue by County",
+            labels={"revenue": "Revenue (KES)"}
         )
         st.plotly_chart(fig_county, use_container_width=True)
     else:
@@ -162,7 +162,6 @@ with tab1:
 # --- TAB 2: Drill-Down ---
 with tab2:
     st.subheader("Drill-Down: Monthly → Daily → Hourly Sales")
-
     if view_option == "Monthly":
         drill_df = filtered_df.groupby('month')['revenue'].sum().reset_index()
         fig = px.line(drill_df, x='month', y='revenue', title='Monthly Sales Trend')
@@ -178,7 +177,6 @@ with tab2:
 # --- TAB 3: Roll-Up ---
 with tab3:
     st.subheader("Roll-Up: Monthly and Quarterly Totals")
-
     if roll_option == "Monthly":
         roll_df = filtered_df.groupby('month')['revenue'].sum().reset_index()
         fig_roll = px.bar(roll_df, x='month', y='revenue', title='Monthly Total Sales')
@@ -198,7 +196,6 @@ with tab4:
         aggfunc='sum',
         fill_value=0
     )
-
     st.dataframe(pivot_df.style.format("{:,.0f}"))
 
     fig_pivot = px.imshow(
