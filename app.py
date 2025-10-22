@@ -2,13 +2,10 @@
 
 import streamlit as st
 import pandas as pd
-from sqlalchemy import create_engine
 import plotly.express as px
 from datetime import datetime
 
 # --- CONFIG ---
-DB_URL = "postgresql://postgres:%23Kenya%402025@db.jojtpfepksshdzpxjlvf.supabase.co:5432/postgres?sslmode=require"
-
 st.set_page_config(
     page_title="TechMart Analytics Dashboard",
     page_icon="🛒",
@@ -19,66 +16,73 @@ st.set_page_config(
 # --- LOAD DATA ---
 @st.cache_data(ttl=600)
 def load_data():
-    engine = create_engine(DB_URL)
-    query = "SELECT * FROM transactions;"
-    df = pd.read_sql(query, engine)
+    """Load TechMart transactions data from Google Drive."""
+    file_id = '16yRoXnEY8AP50tmyCPSdTMOzXD8ipxdb'
+    url = f'https://drive.google.com/uc?id={file_id}&export=download'
 
-    # Convert timestamp columns
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
-    df['month'] = df['timestamp'].dt.to_period('M').astype(str)
-    df['day'] = df['timestamp'].dt.date
-    df['hour'] = df['timestamp'].dt.hour
-    df['quarter'] = df['timestamp'].dt.to_period('Q').astype(str)
+    try:
+        df = pd.read_csv(url)
 
-    # Define age groups
-    def age_group(age):
-        try:
-            age = int(age)
-            if age < 18:
-                return "Minor"
-            elif age < 35:
-                return "Youth"
-            else:
-                return "Adult"
-        except:
-            return "Unknown"
+        # Normalize column names
+        df.columns = df.columns.str.strip().str.lower()
 
-    df["age_group"] = df["age"].apply(age_group)
-    return df
+        # Clean timestamp column
+        df['timestamp'] = pd.to_datetime(df['timestamp'], errors='coerce')
+        df['month'] = df['timestamp'].dt.to_period('M').astype(str)
+        df['day'] = df['timestamp'].dt.date
+        df['hour'] = df['timestamp'].dt.hour
+        df['quarter'] = df['timestamp'].dt.to_period('Q').astype(str)
+
+        # Define age groups
+        def age_group(age):
+            try:
+                age = int(age)
+                if age < 18:
+                    return "Minor"
+                elif age < 35:
+                    return "Youth"
+                else:
+                    return "Adult"
+            except:
+                return "Unknown"
+
+        df["age_group"] = df["age"].apply(age_group)
+
+        return df
+
+    except Exception as e:
+        st.error(f"❌ Error loading CSV: {e}")
+        return pd.DataFrame()
+
+# --- LOAD DATA ---
+with st.spinner("Loading transaction data..."):
+    df = load_data()
+
+if df.empty:
+    st.warning("No data available. Please verify your data source.")
+    st.stop()
 
 # --- SIDEBAR ---
 st.sidebar.title("🧭 Navigation")
 st.sidebar.markdown("Use filters below to explore sales data.")
+st.sidebar.divider()
+st.sidebar.markdown("### 🔍 Filters")
 
-with st.sidebar:
-    st.divider()
-    st.markdown("### 🔍 Filters")
-    refresh = st.button("🔄 Refresh Data")
-
-# Load data
-with st.spinner("Loading transaction data..."):
-    df = load_data()
-
-if refresh:
-    st.cache_data.clear()
-    st.experimental_rerun()
-
-# --- SIDEBAR FILTERS ---
-# County filter
+# --- FILTERS ---
 counties = sorted(df['county'].dropna().unique())
 selected_county = st.sidebar.multiselect("📍 County", counties)
 
 # Store filter depends on selected counties
 if selected_county:
-    store_names = sorted(df[df['county'].isin(selected_county)]['store_name'].dropna().unique())
+    store_names = sorted(df[df['county'].isin(selected_county)]['storename'].dropna().unique())
 else:
-    store_names = sorted(df['store_name'].dropna().unique())
+    store_names = sorted(df['storename'].dropna().unique())
 selected_store = st.sidebar.multiselect("🏪 Store Name", store_names)
 
 # Other filters
 categories = sorted(df['category'].dropna().unique())
 products = sorted(df['product'].dropna().unique())
-payments = sorted(df['payment_method'].dropna().unique())
+payments = sorted(df['paymentmethod'].dropna().unique())
 genders = sorted(df['gender'].dropna().unique())
 
 selected_category = st.sidebar.multiselect("🛍️ Category", categories)
@@ -87,12 +91,13 @@ selected_payment = st.sidebar.multiselect("💳 Payment Method", payments)
 selected_gender = st.sidebar.multiselect("🚻 Gender", genders)
 selected_age_group = st.sidebar.multiselect("👶🧑‍💼👨‍🦳 Age Group", ["Minor", "Youth", "Adult"])
 
-# Drill-down and roll-up options
-view_option = st.sidebar.radio("📅 Drill-Down Level", ["Monthly", "Daily", "Hourly"])
-roll_option = st.sidebar.radio("📊 Roll-Up Period", ["Monthly", "Quarterly"])
-
-st.sidebar.markdown("---")
-st.sidebar.caption("💡 Data auto-refreshes every 10 minutes or manually via the refresh button.")
+# --- DATE FILTER ---
+st.sidebar.markdown("### 🗓️ Date Range Filter")
+date_selection = st.sidebar.date_input(
+    "Select Date Range",
+    value=[],
+    help="Select start and end dates to filter transactions",
+)
 
 # --- APPLY FILTERS ---
 filtered_df = df.copy()
@@ -100,17 +105,30 @@ filtered_df = df.copy()
 if selected_county:
     filtered_df = filtered_df[filtered_df['county'].isin(selected_county)]
 if selected_store:
-    filtered_df = filtered_df[filtered_df['store_name'].isin(selected_store)]
+    filtered_df = filtered_df[filtered_df['storename'].isin(selected_store)]
 if selected_category:
     filtered_df = filtered_df[filtered_df['category'].isin(selected_category)]
 if selected_product:
     filtered_df = filtered_df[filtered_df['product'].isin(selected_product)]
 if selected_payment:
-    filtered_df = filtered_df[filtered_df['payment_method'].isin(selected_payment)]
+    filtered_df = filtered_df[filtered_df['paymentmethod'].isin(selected_payment)]
 if selected_gender:
     filtered_df = filtered_df[filtered_df['gender'].isin(selected_gender)]
 if selected_age_group:
     filtered_df = filtered_df[filtered_df['age_group'].isin(selected_age_group)]
+
+# Apply date filter safely
+if isinstance(date_selection, (list, tuple)) and len(date_selection) == 2:
+    start_date, end_date = date_selection
+    filtered_df = filtered_df[
+        (filtered_df["timestamp"].dt.date >= start_date)
+        & (filtered_df["timestamp"].dt.date <= end_date)
+    ]
+elif isinstance(date_selection, (list, tuple)) and len(date_selection) == 1:
+    start_date = date_selection[0]
+    filtered_df = filtered_df[filtered_df["timestamp"].dt.date == start_date]
+else:
+    st.sidebar.caption("Select one or two dates to apply filtering.")
 
 # --- MAIN PANEL ---
 st.title("🛒 TechMart Sales Analytics Dashboard")
@@ -162,6 +180,7 @@ with tab1:
 # --- TAB 2: Drill-Down ---
 with tab2:
     st.subheader("Drill-Down: Monthly → Daily → Hourly Sales")
+    view_option = st.radio("Select Drill Level", ["Monthly", "Daily", "Hourly"], horizontal=True)
     if view_option == "Monthly":
         drill_df = filtered_df.groupby('month')['revenue'].sum().reset_index()
         fig = px.line(drill_df, x='month', y='revenue', title='Monthly Sales Trend')
@@ -177,6 +196,7 @@ with tab2:
 # --- TAB 3: Roll-Up ---
 with tab3:
     st.subheader("Roll-Up: Monthly and Quarterly Totals")
+    roll_option = st.radio("Select Roll-Up Period", ["Monthly", "Quarterly"], horizontal=True)
     if roll_option == "Monthly":
         roll_df = filtered_df.groupby('month')['revenue'].sum().reset_index()
         fig_roll = px.bar(roll_df, x='month', y='revenue', title='Monthly Total Sales')
