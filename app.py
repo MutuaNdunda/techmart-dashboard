@@ -63,21 +63,20 @@ if df.empty:
     st.stop()
 
 # --- SIDEBAR ---
-st.sidebar.title("🧭 Navigation")
+st.sidebar.title("Navigation")
 st.sidebar.markdown("Use filters below to explore sales data.")
-st.sidebar.divider()
-st.sidebar.markdown("### 🔍 Filters")
+st.sidebar.markdown("#Filters")
 
 # --- FILTERS ---
 counties = sorted(df['county'].dropna().unique())
-selected_county = st.sidebar.multiselect("📍 County", counties)
+selected_county = st.sidebar.multiselect("County", counties)
 
 # Store filter depends on selected counties
 if selected_county:
     store_names = sorted(df[df['county'].isin(selected_county)]['storename'].dropna().unique())
 else:
     store_names = sorted(df['storename'].dropna().unique())
-selected_store = st.sidebar.multiselect("🏪 Store Name", store_names)
+selected_store = st.sidebar.multiselect("Store Name", store_names)
 
 # Other filters
 categories = sorted(df['category'].dropna().unique())
@@ -85,14 +84,14 @@ products = sorted(df['product'].dropna().unique())
 payments = sorted(df['paymentmethod'].dropna().unique())
 genders = sorted(df['gender'].dropna().unique())
 
-selected_category = st.sidebar.multiselect("🛍️ Category", categories)
-selected_product = st.sidebar.multiselect("📦 Product", products)
-selected_payment = st.sidebar.multiselect("💳 Payment Method", payments)
-selected_gender = st.sidebar.multiselect("🚻 Gender", genders)
-selected_age_group = st.sidebar.multiselect("👶🧑‍💼👨‍🦳 Age Group", ["Minor", "Youth", "Adult"])
+selected_category = st.sidebar.multiselect("Category", categories)
+selected_product = st.sidebar.multiselect("Product", products)
+selected_payment = st.sidebar.multiselect("Payment Method", payments)
+selected_gender = st.sidebar.multiselect("Gender", genders)
+selected_age_group = st.sidebar.multiselect("Age Group", ["Minor", "Youth", "Adult"])
 
 # --- DATE FILTER ---
-st.sidebar.markdown("### 🗓️ Date Range Filter")
+st.sidebar.markdown("### Date Range Filter")
 date_selection = st.sidebar.date_input(
     "Select Date Range",
     value=[],
@@ -131,7 +130,7 @@ else:
     st.sidebar.caption("Select one or two dates to apply filtering.")
 
 # --- MAIN PANEL ---
-st.title("🛒 TechMart Sales Analytics Dashboard")
+st.title("TechMart Sales Analytics Dashboard")
 st.markdown(f"**Data Last Loaded:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
 # --- KPIs ---
@@ -141,19 +140,20 @@ avg_sale = filtered_df['revenue'].mean()
 total_discount = filtered_df['discount'].sum()
 
 col1, col2, col3, col4 = st.columns(4)
-col1.metric("🧾 Transactions", f"{total_txns:,}")
-col2.metric("💰 Total Revenue", f"KES {total_revenue:,.0f}")
-col3.metric("🎟️ Total Discount", f"KES {total_discount:,.0f}")
-col4.metric("📊 Avg Sale Value", f"KES {avg_sale:,.0f}")
+col1.metric("Transactions", f"{total_txns:,}")
+col2.metric("Total Revenue", f"KES {total_revenue:,.0f}")
+col3.metric("Total Discount", f"KES {total_discount:,.0f}")
+col4.metric("Avg Sale Value", f"KES {avg_sale:,.0f}")
 
 st.divider()
 
 # --- TABS ---
-tab1, tab2, tab3, tab4 = st.tabs([
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "📊 Location Comparison",
     "🔍 Drill-Down Analysis",
     "📈 Roll-Up Summary",
-    "🔄 Pivot View"
+    "🔄 Pivot View",
+    "👥 Team Members"
 ])
 
 # --- TAB 1: Location Comparison ---
@@ -226,6 +226,32 @@ with tab4:
         color_continuous_scale="YlGnBu"
     )
     st.plotly_chart(fig_pivot, use_container_width=True)
+
+# --- TAB 5: Team Members ---
+with tab5:
+    st.subheader("Project Team Members")
+
+    team_data = {
+        "Registration Number": [
+            "ST62/80168/2024",
+            "ST62/80313/2024",
+            "ST62/80195/2024",
+            "ST62/80774/2024",
+            "ST62/80472/2024"
+        ],
+        "Name": [
+            "Gabriel Ndunda",
+            "Donsy Obura",
+            "Leonard Kiti",
+            "Josephat Motonu",
+            "Tabitha Kiarie"
+        ]
+    }
+
+    df_team = pd.DataFrame(team_data)
+
+    st.table(df_team)
+
 
 st.sidebar.markdown("---")
 st.sidebar.caption("© 2025 TechMart Analytics | Built with Streamlit 🚀")
