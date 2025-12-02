@@ -241,7 +241,7 @@ with tab5:
         ],
         "Name": [
             "Gabriel Ndunda",
-            "Donsy Obura",
+            "Donsy Ombura",
             "Leonard Kiti",
             "Josephat Motonu",
             "Tabitha Kiarie"
